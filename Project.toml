@@ -1,0 +1,7 @@
+[deps]
+CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+TidierFiles = "8ae5e7a9-bdd3-4c93-9cc3-9df4d5d947db"
+TidierPlots = "337ecbd1-5042-4e2a-ae6f-ca776f97570a"

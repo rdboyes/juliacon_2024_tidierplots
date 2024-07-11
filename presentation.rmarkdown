@@ -1,0 +1,102 @@
+---
+title: "Introduction to TidierPlots.jl"
+author: "Randall Boyes"
+format: 
+  revealjs:
+    theme: night
+---
+
+
+
+## About Me
+
+- Epidemiologist
+- Currently: Analytics at Presage Group
+
+## The "tidyverse"
+
+- The best reason to still use R
+- Comprehensive, connected set of packages for reading, wrangling, and visualizing data
+
+## Tidier.jl
+
+::: {.incremental}
+- 100% Julia reimplementation of R's tidyverse
+    - TidierData.jl - dplyr/tidyr
+    - TidierFiles.jl - readr
+    - TidierDB.jl - dbplyr
+    - TidierString.jl - stringr
+    - TidierCats.jl - forcats
+    - TidierText.jl - tidytext
+    - ::: {.fragment .highlight-red}
+    TidierPlots.jl - ggplot2
+:::
+:::
+
+## Brief Introduction to ggplot
+
+- "Part of" the tidyverse
+- Data visualization
+- Based on grammar of graphics
+
+## 
+
+
+
+```{r ggplot-ex1}
+#| echo: true
+#| fig.height: 4
+library(ggplot2)
+
+ggplot(mpg, aes(displ, hwy, colour = class)) + 
+  geom_point()
+```
+
+
+
+##
+
+
+
+```{r ggplot-ex2}
+#| echo: true
+#| fig.height: 4
+library(ggplot2)
+
+ggplot(mpg, aes(displ, hwy, colour = class)) + 
+  geom_point() + geom_line()
+```
+
+
+
+## 
+
+
+
+```{r ggplot-ex3}
+#| echo: true
+#| fig.height: 4
+library(ggplot2)
+
+ggplot(mpg, aes(displ, hwy, colour = class)) + 
+  geom_point() + theme_classic()
+```
+
+
+
+## Key Elements
+
+- Build up any plot that you want by "adding" data, aes mapping, options, themes, etc.
+- "Defaults" in the `ggplot` function pass down to the `geom_*` objects
+
+## Enter TidierPlots
+
+
+
+```{julia}
+#| echo: true
+using TidierPlots, CSV, TidierFiles
+mpg = read_csv("mpg.csv")
+
+ggplot(mpg, aes(:displ, :hwy, colour = :class)) + geom_point()
+```

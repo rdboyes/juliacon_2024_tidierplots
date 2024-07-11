@@ -1,0 +1,454 @@
+---
+title: "Introduction to TidierPlots.jl"
+author: "Randall Boyes"
+engine: julia
+format: 
+  revealjs:
+    theme: night
+---
+
+## About Me
+
+- Epidemiologist
+- Currently: Analytics at Presage Group
+
+## The "tidyverse"
+
+- The best reason to still use R
+- Comprehensive, connected set of packages for reading, wrangling, and visualizing data
+
+## Tidier.jl
+
+::: {.incremental}
+- 100% Julia reimplementation of R's tidyverse
+    - TidierData.jl - dplyr/tidyr
+    - TidierFiles.jl - readr
+    - TidierDB.jl - dbplyr
+    - TidierString.jl - stringr
+    - TidierCats.jl - forcats
+    - TidierText.jl - tidytext
+    - ::: {.fragment .highlight-red}
+    TidierPlots.jl - ggplot2
+:::
+
+## Brief Introduction to ggplot
+
+- "Part of" the tidyverse
+- Data visualization
+- Based on grammar of graphics
+
+## 
+
+```{julia}
+#| echo: true
+#| eval: false
+library(ggplot2)
+
+ggplot(mpg, aes(x = displ, y = hwy, colour = class)) + 
+  geom_point()
+```
+
+![](ggplot_1.png){fig-align="center"}
+
+##
+
+```{julia}
+#| echo: true
+#| eval: false
+library(ggplot2)
+
+ggplot(mpg, aes(x = displ, y = hwy, colour = class)) + 
+  geom_point() + geom_line()
+```
+
+![](ggplot_2.png){fig-align="center"}
+
+## 
+
+```{julia}
+#| echo: true
+#| eval: false
+library(ggplot2)
+
+ggplot(mpg, aes(x = displ, y = hwy, colour = class)) + 
+  geom_point() + theme_classic()
+```
+
+![](ggplot_3.png){fig-align="center"}
+
+## Key Ideas
+
+- Build up any plot that you want by "adding" data, aes mapping, options, themes, etc.
+- "Defaults" in the `ggplot` function pass down to the `geom_*` objects
+
+## The First Pass
+
+```{julia}
+#| echo: true
+#| eval: false
+
+using Makie, CairoMakie, AlgebraOfGraphics
+using PalmerPenguins, DataFrames
+
+penguins = dropmissing(DataFrame(PalmerPenguins.load()))
+
+struct geom
+    visual::Union{Symbol, Nothing}
+    aes::Dict
+    args::Dict
+    analysis::Any
+    required_aes::AbstractArray
+end
+
+struct ggplot
+    geoms::AbstractArray
+    default_aes::Dict
+    data::Symbol
+    axis::NamedTuple
+end
+```
+
+## The First Pass
+
+```{julia}
+#| echo: true
+#| eval: false
+
+function Base.:+(x::ggplot, y...)::ggplot
+    result = ggplot(vcat(x.geoms, [i for i in y]), 
+        x.default_aes, 
+        x.data, 
+        x.axis)
+    
+    return result
+end
+```
+
+## The First Pass
+
+```{julia}
+#| echo: true
+#| eval: false
+
+function extract_aes(geom)
+    aes_dict = Dict{String, Symbol}() 
+    args_dict = Dict{String, Any}() 
+
+    for section in geom
+        if section isa Expr
+            # if the section is an expression, check if it is a aes function call
+            if section.args[1] == :aes
+                for aes_ex in section.args
+                    if aes_ex isa Expr
+                        aes_dict[String(aes_ex.args[1])] = aes_ex.args[2]
+                    end
+                end
+            # if not, its a generic argument
+            else
+                args_dict[String(section.args[1])] = section.args[2]
+            end
+        end
+    end
+
+    return (aes_dict, args_dict)
+end
+
+function check_aes(required_aes, aes_dict)
+    for aes in required_aes
+        if !haskey(aes_dict, aes)
+            error("missing required aesthetic: $aes")
+        end
+    end
+end
+```
+
+## The First Pass
+
+```{julia}
+#| echo: true
+#| eval: false
+macro geom_point(exprs...)
+    geom_visual = :Scatter
+    aes_dict, args_dict = extract_aes(:($(exprs)))
+    analysis = nothing
+    required_aes = ["x", "y"]
+    check_aes(required_aes, aes_dict)
+    return geom(geom_visual, aes_dict, args_dict, nothing, required_aes)
+end
+
+macro geom_smooth(exprs...)
+    geom_visual = nothing
+    aes_dict, args_dict = extract_aes(:($(exprs)))
+    analysis = AlgebraOfGraphics.smooth
+    required_aes = ["x", "y"]
+    if haskey(args_dict, "method")
+        if args_dict["method"] == "lm"
+            analysis = AlgebraOfGraphics.linear
+        end
+    end
+    check_aes(required_aes, aes_dict)
+    return geom(geom_visual, aes_dict, args_dict, analysis, required_aes)
+end
+```
+
+## The First Pass
+
+```{julia}
+#| echo: true
+#| eval: false
+function geom_to_layer(geom)
+    mapping_args = (geom.aes[key] for key in geom.required_aes)
+    
+    layer = data(eval(geom.args["data"])) *
+        mapping(mapping_args...)
+
+    if !isnothing(geom.analysis)
+        layer = layer * (geom.analysis)()
+    end
+
+    if !isnothing(geom.visual)
+        layer = layer * visual(eval(geom.visual))
+    end
+
+    if haskey(geom.aes, "color")
+        layer = layer * mapping(color = geom.aes["color"])
+    end
+
+    return layer
+end
+```
+
+## The First Pass
+
+```{julia}
+#| echo: true
+#| eval: false
+function draw_ggplot(plot::ggplot)
+    for geom in plot.geoms
+        # if data is not specified at the geom level, use the ggplot default
+        if !haskey(geom.args, "data")
+            geom.args["data"] = plot.data
+        end
+
+        # if an aes isn't given in the geom, use the ggplot aes
+        for aes in keys(plot.default_aes)
+            if !haskey(geom.aes, aes)
+                geom.aes[aes] = plot.default_aes[aes]
+            end
+        end
+    end
+
+    layers = []
+
+    for geom in plot.geoms
+        push!(layers, geom_to_layer(geom))
+    end
+
+    if length(layers) == 0
+        error("No geoms supplied")
+    elseif length(layers) == 1
+        draw(layers[1]; axis = plot.axis)
+    else 
+        draw((+)(layers...); axis = plot.axis)
+    end
+end
+```
+
+## The First Pass
+
+```{julia}
+#| echo: true
+#| eval: false
+test_plot = @ggplot(data = penguins, aes(color = species)) + 
+    @geom_point(aes(x = bill_length_mm, y = bill_depth_mm)) + 
+    @geom_smooth(aes(x = bill_length_mm, y = bill_depth_mm), method = "lm")
+
+draw_ggplot(test_plot)
+```
+
+![](original_tidierplot.png){fig-align="center"}
+
+## Enter TidierPlots
+```{julia}
+using TidierFiles
+mpg = read_csv("mpg.csv");
+```
+
+
+```{julia}
+#| echo: true
+using TidierPlots
+
+ggplot(mpg, aes(x = :displ, y = :hwy, color = :class)) + 
+  geom_point()
+```
+
+## How does it work? 
+
+TidierPlots.jl provides: 
+    
+- A set of structs corresponding to ggplot concepts (GGPlot, Geom, Aes, etc.)
+- Functions that look like ggplot functions that generate those structs
+- Definitions for operators using those structs (`+`)
+- A way to translate all of this to `Makie.SpecApi` 
+
+## What can it do? 
+
+```{julia}
+#| eval: false
+#| echo: true
+
+beautiful_makie_theme = Attributes(
+    fonts=(;regular="CMU Serif"),
+)
+
+ggplot(df) + 
+    geom_point(
+        aes(x = :x, y = :y, size = :size, color = :x), 
+        alpha = 0.8) +
+    scale_x_log10() + 
+    scale_y_log10() + 
+    labs(x = "x", y = "y") +
+    lims(y = c(.1, 100)) +
+    scale_color_continuous(
+        palette = "Hiroshige", name = "") +
+    theme(
+        xminorticksvisible=true, 
+        xminorgridvisible=true, 
+        yminorticksvisible=true, 
+        yminorgridvisible=true, 
+        xminorticks=IntervalsBetween(9), 
+        yminorticks=IntervalsBetween(9),
+        backgroundcolor = :transparent, 
+        xgridstyle=:dash,
+        ygridstyle=:dash
+    ) + beautiful_makie_theme
+```
+
+## What can it do? 
+
+![](beautiful_makie.png){fig-align="center"}
+
+## What can it do? 
+
+```{julia}
+#| eval: false
+#| echo: true
+
+Random.seed!(123)
+n = 200
+df = DataFrame(x = randn(n) / 2, y = randn(n))
+
+top = ggplot(df) + 
+    geom_histogram(aes(x = :x), color = (:orangered, 0.5), strokewidth = 0.5) + 
+    lims(x = c(-4, 4)) + 
+    theme(xticklabelsvisible = false, xgridvisible = false) + 
+    beautiful_makie_theme
+
+right = ggplot(df) + 
+    geom_histogram(aes(:y), color = (:dodgerblue, 0.5), 
+        direction = :x, strokewidth = 0.5) + 
+    lims(y = c(-3, 3)) + 
+    theme(yticklabelsvisible = false, ygridvisible = false) +
+    beautiful_makie_theme
+
+middle = ggplot(df) + geom_point(aes(:x, :y), size = 10) + 
+    lims(x = c(-4, 4), y = c(-3, 3)) + labs(x = "x", y = "y") + 
+    beautiful_makie_theme
+
+blank = ggplot() + 
+    theme(xticklabelsvisible = false, xgridvisible = false, yticklabelsvisible = false,
+        ygridvisible = false, xtickcolor = :transparent, ytickcolor = :transparent, 
+        bottomspinevisible = false, topspinevisible = false, rightspinevisible = false, 
+        leftspinevisible = false) + beautiful_makie_theme
+
+top + blank + middle + right + 
+    plot_layout(ncol = 2, nrow = 2, widths = c(3, 1), heights = c(1, 2))
+```
+
+## What can it do? 
+
+![](patchwork.png){fig-align="center"}
+
+## Flying too close to the sun
+
+- `ggplot` allows calculated columns to be created within an `aes` call 
+- Implemented the closest syntax to this: 
+
+```{julia}
+#| eval: false
+#| echo: true
+
+ggplot(data) + geom_point(aes(x = :x/10))
+```
+
+- By defining: 
+
+```{julia}
+#| eval: false
+#| echo: true
+
+Base.:/(s1::Symbol, s2::Real) = [s1] => AesTransform(make_div_const_fn(s2))
+```
+
+## Benefits over ggplot
+
+- Access to Makie's theming/options
+- Pluto notebook interactivity
+- No more dealing with R's handling of fonts and plot scaling
+- Easily add compatibility with more Makie plots
+
+## Benefits over ggplot
+
+:::: {.columns}
+
+::: {.column width="60%"}
+
+```{julia}
+#| eval: false
+#| echo: true
+
+geom_raincloud = geom_template(
+    "geom_raincloud", 
+    ["x", "y"], 
+    :RainClouds)
+
+ggplot(penguins) + 
+    geom_raincloud(
+        aes(x = :species,
+            y = :bill_depth_mm,
+            color = :species), 
+        size = 4) +
+    scale_y_continuous(
+        labels = "{:.1f} cm") + 
+    labs(title = "Bill Depth by Species",
+         x = "Species",
+         y = "Bill Depth") +
+    theme_minimal()
+```
+:::
+
+::: {.column width="40%"}
+![](raincloud.png)
+:::
+
+::::
+
+## What's next? 
+
+- Fix `aes` operations
+- `scale_fill` and `scale_alpha`
+- `facet_grid`
+- More comprehensive documentation and tutorials
+
+## Thanks to contributors
+
+- Karandeep Singh - Tidier
+- Alex Knudson - Documentation
+- Connor Robertson - Patchwork, Labels
+- Daniel Rizk - Documentation
+- Pavel Dimens - Logo Design
+- You? 
+
+
+
