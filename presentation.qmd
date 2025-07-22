@@ -323,7 +323,11 @@ ggplot(penguins) +
 
 ::::
 
+## Thanks!
 
+- Questions? 
+- github.com/TidierOrg/TidierPlots.jl
+- bluesky: @randy.pub
 
 
 
