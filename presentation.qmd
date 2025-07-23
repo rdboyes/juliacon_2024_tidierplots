@@ -12,6 +12,18 @@ format:
 - Epidemiologist (Former?)
 - Currently: Analytics at Presage Group
 
+::: {.columns}
+::: {.column}
+![](IMG_4637.jpg)
+:::
+::: {.column}
+![](IMG_4652.jpg)
+:::
+::: {.column}
+![](IMG_4723.jpg)
+:::
+::: <!-- end columns -->}
+
 ## Thanks to contributors
 
 - Karandeep Singh - Tidier
@@ -83,21 +95,6 @@ ggplot(mpg, aes(x = displ, y = hwy, colour = class)) +
 ```
 
 ![](ggplot_3.png){fig-align="center"}
-
-## Enter TidierPlots
-```{julia}
-using TidierFiles
-mpg = read_csv("mpg.csv");
-```
-
-
-```{julia}
-#| echo: true
-using TidierPlots
-
-ggplot(mpg, aes(x = :displ, y = :hwy, color = :class)) + 
-  geom_point()
-```
 
 ## How does it work? 
 
