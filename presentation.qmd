@@ -12,17 +12,17 @@ format:
 - Epidemiologist (Former?)
 - Currently: Analytics at Presage Group
 
-::: {.columns}
-::: {.column}
+:::: {.columns}
+::: {.column width="33%"}
 ![](IMG_4637.jpg)
 :::
-::: {.column}
+::: {.column width="33%"}
 ![](IMG_4652.jpg)
 :::
-::: {.column}
+::: {.column width="33%"}
 ![](IMG_4723.jpg)
 :::
-::: <!-- end columns -->}
+::::
 
 ## Thanks to contributors
 
